@@ -5,7 +5,24 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 
 const mongoose = require('mongoose')
-mongoose.connect(process.env.MLAB_URI || 'mongodb://localhost/exercise-track' )
+mongoose.connect(process.env.MLAB_URI)
+
+let Schema = mongoose.Schema;
+
+let UserSchema = new Schema({
+  name: String
+});
+
+let Username = mongoose.model('Username', UserSchema);
+
+let ExerciseSchema = new Schema({
+  userId: String,
+  description: String,
+  duration: Number,
+  date: Date
+});
+
+let Exercise = mongoose.model('Exercise', ExerciseSchema);
 
 app.use(cors())
 
@@ -18,6 +35,75 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
 
+app.post("/api/exercise/new-user", (req, res) => {
+  let username = req.body.username;
+  console.log(username);
+  Username.findOne({name: username}).exec((error, userFound) =>{
+        console.log(userFound);
+        if(!userFound){
+          let user = new Username({name: username});
+          console.log(userFound);
+          user.save((err, data)=>{
+            console.log(data);
+            if(err)
+              res.json(err);
+            else
+              res.json(data);
+          });
+        } else {
+          console.log(userFound);
+          res.send("username already taken");
+        }
+  });
+});
+
+
+
+app.post("/api/exercise/add", (req, res) => {
+  let userId = req.body.userId;
+  let description = req.body.description;
+  let duration = req.body.duration;
+  let date = req.body.date;
+
+  let exercise = new Exercise({userId: userId, description: description, duration: duration, date:date});
+  exercise.save((err, data)=>{
+    console.log(data);
+    if(err)
+      res.json(err);
+    else
+      res.json(data);
+  });
+});
+
+//{userId}[&from][&to][&limit]
+app.get("/api/exercise/log", (req, res)=>{
+  let userId = req.query.userId;
+  let from = req.query.from;
+  let to = req.query.to;
+  let limit = req.query.limit;
+  if(!userId){
+    res.send("unknown userId");
+  } else {
+    let query = Exercise.find({userId: userId});
+    if(from){
+      query = query.find({date: { $gte: from}});
+    }
+    if(to){
+      query = query.find({date: { $lte: to}});
+    }
+    if(limit){
+      query = query.limit(parseInt(limit));
+    }
+    query.exec((error, data)=>{
+      if(error){
+        res.json(error);
+      }
+        else {
+          res.json(data);
+        }
+    });
+  }
+});
 
 // Not found middleware
 app.use((req, res, next) => {
@@ -42,6 +128,7 @@ app.use((err, req, res, next) => {
   res.status(errCode).type('txt')
     .send(errMessage)
 })
+
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
